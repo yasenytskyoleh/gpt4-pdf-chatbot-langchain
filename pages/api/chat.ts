@@ -3,13 +3,22 @@ import { OpenAIEmbeddings } from 'langchain/embeddings';
 import { PineconeStore } from 'langchain/vectorstores';
 import { makeChain } from '@/utils/makechain';
 import { pinecone } from '@/utils/pinecone-client';
-import { PINECONE_INDEX_NAME, PINECONE_NAME_SPACE } from '@/config/pinecone';
+import {PINECONE_INDEX_NAME, PINECONE_NAME_SPACE} from '@/config/pinecone';
+import NextCors from "nextjs-cors";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  const { question, history } = req.body;
+
+  await NextCors(req, res, {
+    methods: ['POST'],
+    origin: '*',
+    optionsSuccessStatus: 200,
+  });
+
+
+  const { question, history, id } = req.body && JSON.parse(req.body);
 
   if (!question) {
     return res.status(400).json({ message: 'No question in the request' });
@@ -24,8 +33,8 @@ export default async function handler(
     new OpenAIEmbeddings({}),
     {
       pineconeIndex: index,
-      textKey: 'text',
       namespace: PINECONE_NAME_SPACE,
+      filter: {id}
     },
   );
 
@@ -46,15 +55,15 @@ export default async function handler(
     sendData(JSON.stringify({ data: token }));
   });
 
+
   try {
     //Ask a question
-    const response = await chain.call({
+    await chain.call({
       question: sanitizedQuestion,
-      chat_history: history || [],
+      chat_history: history || '',
     });
 
-    console.log('response', response);
-    sendData(JSON.stringify({ sourceDocs: response.sourceDocuments }));
+    // sendData(JSON.stringify({ sourceDocs: response.sourceDocuments }));
   } catch (error) {
     console.log('error', error);
   } finally {
